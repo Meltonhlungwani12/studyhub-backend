@@ -1,15 +1,12 @@
 {
   "name": "studyhub-backend",
   "version": "1.0.0",
-  "description": "Backend for StudyHub app",
-  "main": "index.js",  // change if your entry point file is named differently
+  "description": "Backend for StudyHub",
+  "main": "server.js",  
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js"
   },
-  "keywords": [],
-  "author": "Meltonhlungwani12",
-  "license": "ISC",
   "dependencies": {
     "express": "^5.1.0",
     "mongoose": "^9.0.0",
