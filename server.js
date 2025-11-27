@@ -5,6 +5,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 
 dotenv.config();
+
 const app = express();
 
 // ==================== MIDDLEWARE ====================
@@ -12,21 +13,24 @@ app.use(cors());
 app.use(express.json());
 
 // ==================== DATABASE ====================
-const mongoURI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/studyhub';
+const mongoURI = process.env.MONGODB_URI;
 
-mongoose.connect(mongoURI)
+mongoose.connect(mongoURI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+})
 .then(() => console.log('✅ MongoDB connected'))
 .catch(err => console.error('❌ MongoDB connection error:', err));
 
 // ==================== MODELS ====================
-// Subject model
+// Subject
 const SubjectSchema = new mongoose.Schema({
   name: { type: String, required: true },
   description: String
 });
 const Subject = mongoose.model('Subject', SubjectSchema);
 
-// Resource model
+// Resource
 const ResourceSchema = new mongoose.Schema({
   title: { type: String, required: true },
   downloads: { type: Number, default: 0 },
@@ -42,7 +46,6 @@ app.get('/api/health', (req, res) => {
 });
 
 // ==================== SUBJECT ROUTES ====================
-// Get all subjects
 app.get('/api/subject', async (req, res) => {
   try {
     const subjects = await Subject.find();
@@ -52,7 +55,6 @@ app.get('/api/subject', async (req, res) => {
   }
 });
 
-// Get single subject
 app.get('/api/subject/:id', async (req, res) => {
   try {
     const subject = await Subject.findById(req.params.id);
@@ -63,7 +65,6 @@ app.get('/api/subject/:id', async (req, res) => {
   }
 });
 
-// Create new subject
 app.post('/api/subject', async (req, res) => {
   try {
     const newSubject = new Subject(req.body);
@@ -74,7 +75,6 @@ app.post('/api/subject', async (req, res) => {
   }
 });
 
-// Update subject
 app.put('/api/subject/:id', async (req, res) => {
   try {
     const updated = await Subject.findByIdAndUpdate(req.params.id, req.body, { new: true });
@@ -85,7 +85,6 @@ app.put('/api/subject/:id', async (req, res) => {
   }
 });
 
-// Delete subject
 app.delete('/api/subject/:id', async (req, res) => {
   try {
     const deleted = await Subject.findByIdAndDelete(req.params.id);
@@ -97,7 +96,6 @@ app.delete('/api/subject/:id', async (req, res) => {
 });
 
 // ==================== RESOURCE ROUTES ====================
-// Get all resources
 app.get('/api/resources', async (req, res) => {
   try {
     const resources = await Resource.find().populate('subject');
@@ -107,7 +105,6 @@ app.get('/api/resources', async (req, res) => {
   }
 });
 
-// Get single resource
 app.get('/api/resources/:id', async (req, res) => {
   try {
     const resource = await Resource.findById(req.params.id).populate('subject');
@@ -118,7 +115,6 @@ app.get('/api/resources/:id', async (req, res) => {
   }
 });
 
-// Create new resource
 app.post('/api/resources', async (req, res) => {
   try {
     const newResource = new Resource(req.body);
@@ -129,7 +125,6 @@ app.post('/api/resources', async (req, res) => {
   }
 });
 
-// Update resource
 app.put('/api/resources/:id', async (req, res) => {
   try {
     const updated = await Resource.findByIdAndUpdate(req.params.id, req.body, { new: true });
@@ -140,7 +135,6 @@ app.put('/api/resources/:id', async (req, res) => {
   }
 });
 
-// Delete resource
 app.delete('/api/resources/:id', async (req, res) => {
   try {
     const deleted = await Resource.findByIdAndDelete(req.params.id);
