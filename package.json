@@ -1,18 +1,20 @@
 {
   "name": "studyhub-backend",
   "version": "1.0.0",
-  "description": "Backend for StudyHub",
-  "main": "server.js",  
+  "description": "Study Hub Backend API",
+  "main": "server.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js"
+    "start": "node server.js",
+    "dev": "nodemon server.js"
   },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
   "dependencies": {
-    "express": "^5.1.0",
-    "mongoose": "^9.0.0",
-    "dotenv": "^17.2.3",
     "cors": "^2.8.5",
-    "body-parser": "^2.2.1"
+    "dotenv": "^17.2.3",
+    "express": "^4.18.2",
+    "mongoose": "^8.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"

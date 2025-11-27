@@ -3,10 +3,8 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const path = require('path');
 
 dotenv.config();
-
 const app = express();
 
 // ==================== MIDDLEWARE ====================
@@ -14,219 +12,166 @@ app.use(cors());
 app.use(express.json());
 
 // ==================== DATABASE ====================
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/studyhub', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
+const mongoURI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/studyhub';
+
+mongoose.connect(mongoURI)
 .then(() => console.log('✅ MongoDB connected'))
-.catch(err => console.error('❌ MongoDB error:', err));
+.catch(err => console.error('❌ MongoDB connection error:', err));
 
 // ==================== MODELS ====================
-// Subject Model
-const subjectSchema = new mongoose.Schema({
-  name: String,
-  slug: String,
-  icon: String,
-  category: String,
-  description: String,
-  resourceCount: { type: Number, default: 0 }
-}, { timestamps: true });
+// Subject model
+const SubjectSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  description: String
+});
+const Subject = mongoose.model('Subject', SubjectSchema);
 
-const Subject = mongoose.model('Subject', subjectSchema);
-
-// Resource Model
-const resourceSchema = new mongoose.Schema({
-  name: String,
-  subject: String,
-  type: String, // past-papers, notes, videos, textbooks, quizzes
-  description: String,
-  link: String,
-  fileSize: String,
-  year: Number,
+// Resource model
+const ResourceSchema = new mongoose.Schema({
+  title: { type: String, required: true },
   downloads: { type: Number, default: 0 },
-  views: { type: Number, default: 0 }
-}, { timestamps: true });
-
-const Resource = mongoose.model('Resource', resourceSchema);
+  views: { type: Number, default: 0 },
+  subject: { type: mongoose.Schema.Types.ObjectId, ref: 'Subject' }
+});
+const Resource = mongoose.model('Resource', ResourceSchema);
 
 // ==================== ROUTES ====================
-
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date() });
 });
 
-// ==================== SUBJECTS ROUTES ====================
-
+// ==================== SUBJECT ROUTES ====================
 // Get all subjects
-app.get('/api/subjects', async (req, res) => {
+app.get('/api/subject', async (req, res) => {
   try {
-    const { category, search } = req.query;
-    let query = {};
-    if (category && category !== 'all') query.category = category;
-    if (search) query.name = { $regex: search, $options: 'i' };
-
-    const subjects = await Subject.find(query).sort({ name: 1 });
-    res.json({ success: true, count: subjects.length, subjects });
+    const subjects = await Subject.find();
+    res.json(subjects);
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ error: err.message });
   }
 });
 
 // Get single subject
-app.get('/api/subjects/:slug', async (req, res) => {
+app.get('/api/subject/:id', async (req, res) => {
   try {
-    const subject = await Subject.findOne({ slug: req.params.slug });
-    if (!subject) return res.status(404).json({ success: false, message: 'Subject not found' });
-    res.json({ success: true, subject });
+    const subject = await Subject.findById(req.params.id);
+    if (!subject) return res.status(404).json({ error: 'Subject not found' });
+    res.json(subject);
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ error: err.message });
   }
 });
 
-// Create subject
-app.post('/api/subjects', async (req, res) => {
+// Create new subject
+app.post('/api/subject', async (req, res) => {
   try {
-    const subject = await Subject.create(req.body);
-    res.status(201).json({ success: true, subject });
+    const newSubject = new Subject(req.body);
+    const saved = await newSubject.save();
+    res.json(saved);
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ error: err.message });
   }
 });
 
 // Update subject
-app.put('/api/subjects/:id', async (req, res) => {
+app.put('/api/subject/:id', async (req, res) => {
   try {
-    const subject = await Subject.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!subject) return res.status(404).json({ success: false, message: 'Subject not found' });
-    res.json({ success: true, subject });
+    const updated = await Subject.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!updated) return res.status(404).json({ error: 'Subject not found' });
+    res.json(updated);
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ error: err.message });
   }
 });
 
 // Delete subject
-app.delete('/api/subjects/:id', async (req, res) => {
+app.delete('/api/subject/:id', async (req, res) => {
   try {
-    const subject = await Subject.findByIdAndDelete(req.params.id);
-    if (!subject) return res.status(404).json({ success: false, message: 'Subject not found' });
+    const deleted = await Subject.findByIdAndDelete(req.params.id);
+    if (!deleted) return res.status(404).json({ error: 'Subject not found' });
     res.json({ success: true, message: 'Subject deleted' });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ error: err.message });
   }
 });
 
-// ==================== RESOURCES ROUTES ====================
-
+// ==================== RESOURCE ROUTES ====================
 // Get all resources
 app.get('/api/resources', async (req, res) => {
   try {
-    const { subject, type, year, search, page = 1, limit = 20 } = req.query;
-    let query = {};
-    if (subject) query.subject = subject;
-    if (type) query.type = type;
-    if (year) query.year = parseInt(year);
-    if (search) query.$or = [
-      { name: { $regex: search, $options: 'i' } },
-      { description: { $regex: search, $options: 'i' } }
-    ];
-
-    const skip = (page - 1) * limit;
-    const resources = await Resource.find(query).sort({ createdAt: -1 }).limit(parseInt(limit)).skip(skip);
-    const total = await Resource.countDocuments(query);
-
-    res.json({
-      success: true,
-      count: resources.length,
-      total,
-      page: parseInt(page),
-      pages: Math.ceil(total / limit),
-      resources
-    });
+    const resources = await Resource.find().populate('subject');
+    res.json(resources);
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ error: err.message });
   }
 });
 
 // Get single resource
 app.get('/api/resources/:id', async (req, res) => {
   try {
-    const resource = await Resource.findById(req.params.id);
-    if (!resource) return res.status(404).json({ success: false, message: 'Resource not found' });
-
-    resource.views += 1;
-    await resource.save();
-
-    res.json({ success: true, resource });
+    const resource = await Resource.findById(req.params.id).populate('subject');
+    if (!resource) return res.status(404).json({ error: 'Resource not found' });
+    res.json(resource);
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ error: err.message });
   }
 });
 
-// Create resource
+// Create new resource
 app.post('/api/resources', async (req, res) => {
   try {
-    const resource = await Resource.create(req.body);
-    await Subject.findOneAndUpdate({ name: resource.subject }, { $inc: { resourceCount: 1 } });
-    res.status(201).json({ success: true, resource });
+    const newResource = new Resource(req.body);
+    const saved = await newResource.save();
+    res.json(saved);
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ error: err.message });
   }
 });
 
 // Update resource
 app.put('/api/resources/:id', async (req, res) => {
   try {
-    const resource = await Resource.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!resource) return res.status(404).json({ success: false, message: 'Resource not found' });
-    res.json({ success: true, resource });
+    const updated = await Resource.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!updated) return res.status(404).json({ error: 'Resource not found' });
+    res.json(updated);
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ error: err.message });
   }
 });
 
 // Delete resource
 app.delete('/api/resources/:id', async (req, res) => {
   try {
-    const resource = await Resource.findByIdAndDelete(req.params.id);
-    if (!resource) return res.status(404).json({ success: false, message: 'Resource not found' });
-    await Subject.findOneAndUpdate({ name: resource.subject }, { $inc: { resourceCount: -1 } });
+    const deleted = await Resource.findByIdAndDelete(req.params.id);
+    if (!deleted) return res.status(404).json({ error: 'Resource not found' });
     res.json({ success: true, message: 'Resource deleted' });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ error: err.message });
   }
 });
 
-// Track download
-app.post('/api/resources/:id/download', async (req, res) => {
-  try {
-    const resource = await Resource.findById(req.params.id);
-    if (!resource) return res.status(404).json({ success: false, message: 'Resource not found' });
-
-    resource.downloads += 1;
-    await resource.save();
-
-    res.json({ success: true, downloads: resource.downloads });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-// ==================== STATS ====================
+// ==================== STATS ROUTE ====================
 app.get('/api/stats', async (req, res) => {
   try {
     const subjectCount = await Subject.countDocuments();
     const resourceCount = await Resource.countDocuments();
-    const totalDownloads = await Resource.aggregate([{ $group: { _id: null, total: { $sum: '$downloads' } } }]);
-    const totalViews = await Resource.aggregate([{ $group: { _id: null, total: { $sum: '$views' } } }]);
+
+    const totalDownloadsAgg = await Resource.aggregate([
+      { $group: { _id: null, total: { $sum: '$downloads' } } }
+    ]);
+
+    const totalViewsAgg = await Resource.aggregate([
+      { $group: { _id: null, total: { $sum: '$views' } } }
+    ]);
 
     res.json({
       success: true,
       stats: {
         subjects: subjectCount,
         resources: resourceCount,
-        downloads: totalDownloads[0]?.total || 0,
-        views: totalViews[0]?.total || 0
+        downloads: totalDownloadsAgg[0]?.total || 0,
+        views: totalViewsAgg[0]?.total || 0
       }
     });
   } catch (err) {
@@ -234,20 +179,7 @@ app.get('/api/stats', async (req, res) => {
   }
 });
 
-// ==================== SERVE REACT FRONTEND ====================
-app.use(express.static(path.join(__dirname, 'build')));
-
-app.get('/*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'build', 'index.html'));
-});
-
-// ==================== ERROR HANDLING ====================
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ success: false, message: 'Something went wrong!' });
-});
-
-// 404 handler
+// ==================== 404 ====================
 app.use((req, res) => {
   res.status(404).json({ success: false, message: 'Route not found' });
 });
